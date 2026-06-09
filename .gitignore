@@ -1,0 +1,13 @@
+# Temporary build/test scripts
+build.bat
+test_env.bat
+
+# Compiled binaries
+*.exe
+*.obj
+*.pdb
+*.ilk
+
+# System files
+.DS_Store
+Thumbs.db

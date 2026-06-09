@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Capture Card Viewer</title>
+  <meta name="description" content="Fullscreen-Anzeige für Capture-Karten – zeigt das Videobild der Capture-Karte auf dem gesamten Bildschirm an." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: rgba(255,255,255,0.06);
+      --surface-hover: rgba(255,255,255,0.10);
+      --border: rgba(255,255,255,0.08);
+      --text: #e4e4e7;
+      --text-muted: #71717a;
+      --accent: #818cf8;
+      --accent-glow: rgba(129,140,248,0.35);
+      --danger: #f87171;
+      --success: #34d399;
+      --radius: 14px;
+      --font: 'Inter', system-ui, sans-serif;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: var(--font);
+      color: var(--text);
+      cursor: none;
+    }
+
+    body.controls-visible { cursor: default; }
+
+    /* ── Video ── */
+    #video-feed {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: contain;
+      background: #000;
+      z-index: 1;
+    }
+
+    /* ── Overlay (controls) ── */
+    #overlay {
+      position: fixed; inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    #overlay.visible {
+      opacity: 1;
+    }
+
+    #overlay > * { pointer-events: auto; }
+
+    /* Top bar */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 18px 24px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.72) 0%, transparent 100%);
+    }
+
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 15px; letter-spacing: -0.02em;
+    }
+
+    .logo-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), #6366f1);
+      display: grid; place-items: center;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .logo-icon svg { width: 18px; height: 18px; fill: #fff; }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: background 0.3s;
+    }
+
+    .status-dot.live { background: var(--success); box-shadow: 0 0 8px rgba(52,211,153,0.6); animation: pulse-dot 2s infinite; }
+    .status-dot.error { background: var(--danger); box-shadow: 0 0 8px rgba(248,113,113,0.6); }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .status-label {
+      font-size: 12px; font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Bottom bar */
+    .bottom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 18px 24px;
+      background: linear-gradient(0deg, rgba(0,0,0,0.72) 0%, transparent 100%);
+      flex-wrap: wrap;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 18px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.12s;
+      user-select: none;
+    }
+
+    .btn:hover {
+      background: var(--surface-hover);
+      border-color: rgba(255,255,255,0.16);
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
+
+    .btn.primary {
+      background: linear-gradient(135deg, var(--accent), #6366f1);
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .btn.primary:hover { box-shadow: 0 0 30px var(--accent-glow); }
+
+    /* Select */
+    .device-select {
+      padding: 10px 36px 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2371717a' viewBox='0 0 16 16'%3E%3Cpath d='M8 11.4L2.6 6h10.8z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      transition: background 0.2s, border-color 0.2s;
+      max-width: 260px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .device-select:hover {
+      background-color: var(--surface-hover);
+      border-color: rgba(255,255,255,0.16);
+    }
+
+    .device-select option { background: #1a1a2e; color: var(--text); }
+
+    /* Volume slider styling */
+    .volume-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2px 12px 2px 4px;
+      border-radius: var(--radius);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    #volume-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      width: 70px;
+      border-radius: 3px;
+      background: var(--border);
+      outline: none;
+      transition: background 0.2s;
+    }
+    
+    #volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    /* Resolution badge */
+    .res-badge {
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      font-size: 11px; font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Welcome screen ── */
+    #welcome {
+      position: fixed; inset: 0;
+      z-index: 20;
+      display: grid; place-items: center;
+      background: var(--bg);
+      transition: opacity 0.5s ease, visibility 0.5s;
+    }
+
+    #welcome.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+    .welcome-card {
+      text-align: center;
+      max-width: 480px;
+      padding: 40px 32px;
+      border-radius: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(24px);
+      animation: float-in 0.6s cubic-bezier(0.22,1,0.36,1);
+    }
+
+    @keyframes float-in {
+      from { opacity: 0; transform: translateY(24px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .welcome-card .logo-icon {
+      width: 56px; height: 56px;
+      border-radius: 16px;
+      margin: 0 auto 20px;
+    }
+
+    .welcome-card .logo-icon svg { width: 28px; height: 28px; }
+
+    .welcome-card h1 {
+      font-size: 22px; font-weight: 700;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #fff, var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    .welcome-card p {
+      font-size: 14px; color: var(--text-muted);
+      line-height: 1.6; margin-bottom: 24px;
+    }
+
+    .welcome-card .device-select { width: 100%; max-width: 100%; margin-bottom: 12px; }
+    .welcome-card .btn { width: 100%; justify-content: center; }
+
+    /* ── Error toast ── */
+    #error-toast {
+      position: fixed;
+      top: 24px; left: 50%; transform: translateX(-50%) translateY(-120%);
+      z-index: 100;
+      padding: 12px 20px;
+      border-radius: var(--radius);
+      background: rgba(248,113,113,0.15);
+      border: 1px solid rgba(248,113,113,0.3);
+      color: var(--danger);
+      font-size: 13px; font-weight: 500;
+      backdrop-filter: blur(16px);
+      transition: transform 0.4s cubic-bezier(0.22,1,0.36,1);
+      max-width: 90vw;
+      text-align: center;
+    }
+
+    #error-toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ── Responsive ── */
+    @media (max-width: 520px) {
+      .welcome-card { margin: 16px; padding: 32px 24px; }
+      .bottom-bar { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Video element (without muted attribute to allow audio output) -->
+  <video id="video-feed" autoplay playsinline></video>
+
+  <!-- Overlay controls (auto-hide) -->
+  <div id="overlay">
+    <div class="top-bar">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4V6.5l-4 4z"/></svg>
+        </div>
+        Capture Viewer
+      </div>
+      <div class="status-dot" id="status-dot"></div>
+      <span class="status-label" id="status-label">Bereit</span>
+      <div style="flex:1"></div>
+      <div class="res-badge" id="res-badge">—</div>
+    </div>
+
+    <div class="bottom-bar">
+      <!-- Video Input Selector -->
+      <select class="device-select" id="device-select-bar" title="Video-Gerät wählen"></select>
+      
+      <!-- Audio Input Selector -->
+      <select class="device-select" id="audio-select-bar" title="Audio-Quelle wählen"></select>
+
+      <!-- Volume controls -->
+      <div class="volume-container">
+        <button class="btn" id="btn-mute" title="Stummschalten" style="padding: 8px; border: none; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;">
+          <svg id="icon-volume" viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: var(--text);"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+        </button>
+        <input type="range" id="volume-slider" min="0" max="1" step="0.02" value="1.0" title="Lautstärke" />
+      </div>
+
+      <button class="btn" id="btn-fit" title="Darstellungsmodus wechseln">
+        <svg viewBox="0 0 24 24"><path d="M3 3h7v2H5v5H3V3zm11 0h7v7h-2V5h-5V3zM3 14h2v5h5v2H3v-7zm18 0v7h-7v-2h5v-5h2z"/></svg>
+        <span id="fit-label">Einpassen</span>
+      </button>
+
+      <button class="btn primary" id="btn-fullscreen" title="Vollbild">
+        <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+        Vollbild
+      </button>
+    </div>
+  </div>
+
+  <!-- Welcome screen -->
+  <div id="welcome">
+    <div class="welcome-card">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4V6.5l-4 4z"/></svg>
+      </div>
+      <h1>Capture Card Viewer</h1>
+      <p>Wähle dein Video- und Audio-Gerät aus, um deine Capture-Karte in Echtzeit abzuspielen.</p>
+      
+      <div style="text-align: left; margin-bottom: 6px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Video-Quelle:</div>
+      <select class="device-select" id="device-select-welcome"></select>
+      
+      <div style="text-align: left; margin-bottom: 6px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-top: 10px;">Audio-Quelle:</div>
+      <select class="device-select" id="audio-select-welcome"></select>
+      
+      <button class="btn primary" id="btn-start" style="margin-top: 24px;">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        Stream starten
+      </button>
+    </div>
+  </div>
+
+  <!-- Error toast -->
+  <div id="error-toast" role="alert"></div>
+
+  <script>
+    // ── Elements ──
+    const video = document.getElementById('video-feed');
+    const overlay = document.getElementById('overlay');
+    const welcome = document.getElementById('welcome');
+    const statusDot = document.getElementById('status-dot');
+    const statusLabel = document.getElementById('status-label');
+    const resBadge = document.getElementById('res-badge');
+    
+    const selectWelcome = document.getElementById('device-select-welcome');
+    const selectBar = document.getElementById('device-select-bar');
+    const selectAudioWelcome = document.getElementById('audio-select-welcome');
+    const selectAudioBar = document.getElementById('audio-select-bar');
+    
+    const btnStart = document.getElementById('btn-start');
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+    const btnFit = document.getElementById('btn-fit');
+    const fitLabel = document.getElementById('fit-label');
+    const errorToast = document.getElementById('error-toast');
+    
+    const volumeSlider = document.getElementById('volume-slider');
+    const btnMute = document.getElementById('btn-mute');
+    const iconVolume = document.getElementById('icon-volume');
+
+    let currentStream = null;
+    let fitMode = 'contain'; // 'contain' | 'cover'
+    let hideTimer = null;
+    let previousVolume = 1.0;
+
+    // ── Device enumeration ──
+    async function loadDevices() {
+      try {
+        // Request temporary access to trigger permission prompt for both video and audio
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        tempStream.getTracks().forEach(t => t.stop());
+      } catch (_) { /* user may deny – we still try to enumerate */ }
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter(d => d.kind === 'videoinput');
+      const audioInputs = devices.filter(d => d.kind === 'audioinput');
+
+      // Populate video selectors
+      [selectWelcome, selectBar].forEach(sel => {
+        sel.innerHTML = '';
+        if (videoInputs.length === 0) {
+          const opt = document.createElement('option');
+          opt.textContent = 'Kein Videogerät gefunden';
+          opt.disabled = true;
+          sel.appendChild(opt);
+        }
+        videoInputs.forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d.deviceId;
+          opt.textContent = d.label || `Videogerät ${sel.options.length + 1}`;
+          sel.appendChild(opt);
+        });
+      });
+
+      // Populate audio selectors
+      [selectAudioWelcome, selectAudioBar].forEach(sel => {
+        sel.innerHTML = '';
+        const noneOpt = document.createElement('option');
+        noneOpt.value = '';
+        noneOpt.textContent = 'Kein Ton (Stumm)';
+        sel.appendChild(noneOpt);
+
+        if (audioInputs.length === 0) {
+          const opt = document.createElement('option');
+          opt.textContent = 'Keine Audioquelle gefunden';
+          opt.disabled = true;
+          sel.appendChild(opt);
+        }
+        audioInputs.forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d.deviceId;
+          opt.textContent = d.label || `Audiogerät ${sel.options.length}`;
+          sel.appendChild(opt);
+        });
+      });
+
+      // Helper function to auto-match audio based on video selection
+      function autoSelectAudio(videoDeviceId) {
+        const videoDevice = videoInputs.find(d => d.deviceId === videoDeviceId);
+        if (videoDevice && videoDevice.label) {
+          const vLabel = videoDevice.label.toLowerCase();
+          const matchingAudio = audioInputs.find(a => {
+            const aLabel = (a.label || '').toLowerCase();
+            if (vLabel.includes('ugreen') && aLabel.includes('ugreen')) return true;
+            if (vLabel.includes('capture') && aLabel.includes('capture')) return true;
+            if (vLabel.includes('hdmi') && aLabel.includes('hdmi')) return true;
+            if (vLabel.includes('usb') && aLabel.includes('usb')) return true;
+            return false;
+          });
+          if (matchingAudio) {
+            selectAudioWelcome.value = matchingAudio.deviceId;
+            selectAudioBar.value = matchingAudio.deviceId;
+          }
+        }
+      }
+
+      // Auto-select UGREEN or best default devices initially
+      const ugreenVideo = videoInputs.find(d => (d.label || '').toLowerCase().includes('ugreen'));
+      if (ugreenVideo) {
+        selectWelcome.value = ugreenVideo.deviceId;
+        selectBar.value = ugreenVideo.deviceId;
+        autoSelectAudio(ugreenVideo.deviceId);
+      } else if (videoInputs.length > 0) {
+        selectWelcome.value = videoInputs[0].deviceId;
+        selectBar.value = videoInputs[0].deviceId;
+        autoSelectAudio(videoInputs[0].deviceId);
+      }
+
+      // Sync select changes
+      selectWelcome.addEventListener('change', () => {
+        selectBar.value = selectWelcome.value;
+        autoSelectAudio(selectWelcome.value);
+      });
+      
+      selectBar.addEventListener('change', () => {
+        selectWelcome.value = selectBar.value;
+        autoSelectAudio(selectBar.value);
+        startStream(selectBar.value, selectAudioBar.value);
+      });
+
+      selectAudioWelcome.addEventListener('change', () => {
+        selectAudioBar.value = selectAudioWelcome.value;
+      });
+      
+      selectAudioBar.addEventListener('change', () => {
+        selectAudioWelcome.value = selectAudioBar.value;
+        startStream(selectBar.value, selectAudioBar.value);
+      });
+
+      return { videoInputs, audioInputs };
+    }
+
+    // ── Start stream ──
+    async function startStream(videoDeviceId, audioDeviceId) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+      }
+
+      setStatus('connecting');
+
+      try {
+        const constraints = {
+          video: {
+            deviceId: videoDeviceId ? { exact: videoDeviceId } : undefined,
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 60 }
+          },
+          audio: audioDeviceId ? {
+            deviceId: { exact: audioDeviceId },
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+          } : false
+        };
+
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // Feed into video element
+        video.srcObject = currentStream;
+        video.muted = false; // Must be false so sound plays
+        
+        await video.play();
+
+        welcome.classList.add('hidden');
+        setStatus('live');
+        updateResolution();
+        
+        // Apply initial volume
+        video.volume = volumeSlider.value;
+        updateVolumeIcon();
+
+      } catch (err) {
+        console.error(err);
+        setStatus('error');
+        showError(getErrorMessage(err));
+      }
+    }
+
+    function getErrorMessage(err) {
+      if (err.name === 'NotAllowedError') return 'Zugriff auf Kamera/Mikrofon verweigert. Bitte erlaube den Zugriff in den Browser-Einstellungen.';
+      if (err.name === 'NotFoundError') return 'Videogerät nicht gefunden. Stelle sicher, dass die Capture-Karte angeschlossen ist.';
+      if (err.name === 'NotReadableError') return 'Das Gerät wird bereits von einer anderen App blockiert.';
+      return `Fehler: ${err.message}`;
+    }
+
+    // ── Status ──
+    function setStatus(state) {
+      statusDot.className = 'status-dot';
+      if (state === 'live') {
+        statusDot.classList.add('live');
+        statusLabel.textContent = 'Live';
+      } else if (state === 'error') {
+        statusDot.classList.add('error');
+        statusLabel.textContent = 'Fehler';
+      } else if (state === 'connecting') {
+        statusLabel.textContent = 'Verbinden…';
+      } else {
+        statusLabel.textContent = 'Bereit';
+      }
+    }
+
+    // ── Resolution badge ──
+    function updateResolution() {
+      if (!currentStream) return;
+      const track = currentStream.getVideoTracks()[0];
+      if (!track) return;
+      const settings = track.getSettings();
+      const w = settings.width || '?';
+      const h = settings.height || '?';
+      const fps = settings.frameRate ? Math.round(settings.frameRate) : '?';
+      resBadge.textContent = `${w}×${h} @ ${fps}fps`;
+    }
+
+    // ── Error toast ──
+    function showError(msg) {
+      errorToast.textContent = msg;
+      errorToast.classList.add('show');
+      setTimeout(() => errorToast.classList.remove('show'), 5000);
+    }
+
+    // ── Volume & Mute handling ──
+    volumeSlider.addEventListener('input', () => {
+      video.volume = volumeSlider.value;
+      if (volumeSlider.value > 0) {
+        video.muted = false;
+      }
+      updateVolumeIcon();
+    });
+
+    btnMute.addEventListener('click', () => {
+      if (video.muted || video.volume === 0) {
+        video.muted = false;
+        if (volumeSlider.value === '0') {
+          volumeSlider.value = previousVolume > 0.05 ? previousVolume : 1.0;
+        }
+        video.volume = volumeSlider.value;
+      } else {
+        previousVolume = video.volume;
+        video.muted = true;
+        volumeSlider.value = 0.0;
+      }
+      updateVolumeIcon();
+    });
+
+    function updateVolumeIcon() {
+      if (video.muted || volumeSlider.value == 0) {
+        iconVolume.innerHTML = `<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.21.05-.42.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>`;
+        btnMute.title = "Stummschaltung aufheben";
+      } else if (volumeSlider.value < 0.5) {
+        iconVolume.innerHTML = `<path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>`;
+        btnMute.title = "Stummschalten";
+      } else {
+        iconVolume.innerHTML = `<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>`;
+        btnMute.title = "Stummschalten";
+      }
+    }
+
+    // ── Fit mode ──
+    btnFit.addEventListener('click', () => {
+      fitMode = fitMode === 'contain' ? 'cover' : 'contain';
+      video.style.objectFit = fitMode;
+      fitLabel.textContent = fitMode === 'contain' ? 'Einpassen' : 'Füllen';
+    });
+
+    // ── Fullscreen ──
+    btnFullscreen.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+
+    // ── Auto-hide controls ──
+    function showControls() {
+      overlay.classList.add('visible');
+      document.body.classList.add('controls-visible');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        overlay.classList.remove('visible');
+        document.body.classList.remove('controls-visible');
+      }, 3000);
+    }
+
+    document.addEventListener('mousemove', showControls);
+    document.addEventListener('click', (e) => {
+      if (!overlay.contains(e.target)) showControls();
+    });
+
+    // ── Keyboard shortcuts ──
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'f' || e.key === 'F') {
+        btnFullscreen.click();
+      } else if (e.key === 'Escape' && document.fullscreenElement) {
+        document.exitFullscreen();
+      } else if (e.key === 'm' || e.key === 'M') {
+        btnFit.click();
+      }
+      showControls();
+    });
+
+    // ── Double-click fullscreen ──
+    video.addEventListener('dblclick', () => {
+      btnFullscreen.click();
+    });
+
+    // ── Start button ──
+    btnStart.addEventListener('click', () => {
+      startStream(selectWelcome.value, selectAudioWelcome.value);
+    });
+
+    // ── Init ──
+    loadDevices();
+
+    // Re-enumerate on device change
+    navigator.mediaDevices.addEventListener('devicechange', loadDevices);
+  </script>
+
+</body>
+</html>
