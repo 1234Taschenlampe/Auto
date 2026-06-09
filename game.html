@@ -21,76 +21,57 @@
       overflow: hidden;
       background: #000;
       font-family: 'Share Tech Mono', monospace;
-      color: #0f0;
       cursor: none; /* Hide default cursor */
     }
 
-    /* Matrix canvas */
-    canvas {
+    /* Desktop screenshot background */
+    #desktop-bg {
       position: absolute;
       inset: 0;
-      z-index: 1;
-    }
-
-    /* Screen Overlay */
-    .overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background: rgba(0, 0, 0, 0.4);
-      pointer-events: none;
-      text-align: center;
-    }
-
-    .box {
-      background: rgba(0, 20, 0, 0.85);
-      border: 2px solid #0f0;
-      box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
-      padding: 30px 50px;
-      border-radius: 12px;
-      animation: pulse-border 2s infinite;
-      pointer-events: auto;
-    }
-
-    h1 {
-      font-size: 38px;
-      letter-spacing: 2px;
-      margin-bottom: 15px;
-      text-shadow: 0 0 10px #0f0;
-    }
-
-    p {
-      font-size: 18px;
-      color: #8f8;
-      margin-bottom: 25px;
-    }
-
-    .difficulty-bar {
-      width: 100%;
-      height: 10px;
-      background: #020;
-      border: 1px solid #0f0;
-      border-radius: 5px;
-      overflow: hidden;
-      margin-top: 15px;
-    }
-
-    .difficulty-progress {
       width: 100%;
       height: 100%;
-      background: #0f0;
-      transition: width 1s linear;
+      object-fit: cover;
+      z-index: 1;
+      filter: brightness(0.9);
     }
 
-    /* Custom Mouse Cursors */
+    /* Canvas for drawing the slime connection and particles */
+    #canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* Message HUD Overlay */
+    .hud {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.75);
+      border: 2px solid #0f0;
+      box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+      padding: 12px 30px;
+      border-radius: 8px;
+      text-align: center;
+      color: #0f0;
+      font-size: 16px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    .hud.visible {
+      opacity: 1;
+    }
+
+    /* Custom Cursors */
     .cursor-user {
       position: fixed;
-      width: 30px;
-      height: 30px;
+      width: 32px;
+      height: 32px;
       border: 2px solid #ff3333;
       border-radius: 50%;
       transform: translate(-50%, -50%);
@@ -109,38 +90,24 @@
       transform: translate(-50%, -50%);
     }
 
-    /* Ghost Cursor (Evasive target) */
     .cursor-target {
       position: fixed;
       width: 19px;
       height: 24px;
       pointer-events: none;
       z-index: 99;
-      transform: translate(-2px, -2px); /* Align cursor tip */
-      transition: transform 0.05s ease-out;
+      transform: translate(-2px, -2px);
+      display: none; /* Hidden until first movement */
     }
 
-    /* Admin link */
-    .admin-link {
-      position: absolute;
-      bottom: 15px;
-      right: 15px;
-      font-size: 12px;
-      color: rgba(0, 255, 0, 0.4);
-      cursor: pointer;
-      text-decoration: underline;
-      z-index: 20;
-      pointer-events: auto;
-    }
-    
-    .admin-link:hover {
-      color: #0f0;
-    }
-
-    /* Success screen */
+    /* Success screen popup */
     .success-box {
       display: none;
-      background: rgba(0, 30, 0, 0.95);
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 20, 0, 0.95);
       border: 3px solid #00ff66;
       box-shadow: 0 0 40px rgba(0, 255, 102, 0.5);
       padding: 40px 60px;
@@ -148,6 +115,7 @@
       text-align: center;
       z-index: 50;
       pointer-events: auto;
+      color: #0f0;
     }
 
     .success-box h2 {
@@ -156,17 +124,43 @@
       margin-bottom: 20px;
       text-shadow: 0 0 15px #00ff66;
     }
+    
+    .btn {
+      background: transparent;
+      border: 1px solid #0f0;
+      color: #0f0;
+      padding: 8px 20px;
+      font-family: inherit;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 6px;
+      margin-top: 10px;
+    }
 
-    @keyframes pulse-border {
-      0%, 100% { border-color: #0f0; box-shadow: 0 0 30px rgba(0, 255, 0, 0.3); }
-      50% { border-color: #008800; box-shadow: 0 0 15px rgba(0, 136, 0, 0.1); }
+    /* Admin link */
+    .admin-link {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.3);
+      cursor: pointer;
+      text-decoration: underline;
+      z-index: 20;
+      pointer-events: auto;
+    }
+    .admin-link:hover {
+      color: #fff;
     }
   </style>
 </head>
 <body>
 
-  <!-- Falling Matrix Code -->
-  <canvas id="matrix"></canvas>
+  <!-- Captured desktop screenshot background -->
+  <img id="desktop-bg" src="desktop.png" alt="Desktop Background" onerror="this.src=''" />
+
+  <!-- Canvas for drawing the slime connection -->
+  <canvas id="canvas"></canvas>
 
   <!-- Player Custom Cursor (Red crosshair) -->
   <div class="cursor-user" id="user-cursor"></div>
@@ -176,31 +170,25 @@
     <path fill="#ffffff" stroke="#000000" stroke-width="1.5" d="M4.5 3v15.2l4.4-4.3 3.1 7.2 2.8-1.2-3.1-7.2h6.1z"/>
   </svg>
 
-  <!-- Lockout Overlay -->
-  <div class="overlay" id="lockout-overlay">
-    <div class="box" id="game-box">
-      <h1>SYSTEM DECRYPTION LOCKOUT</h1>
-      <p>Bewege dein Fadenkreuz und fange deinen entflohenen Cursor!</p>
-      <div style="font-size: 14px; color: #a4ffa4;">Drücke ESCAPE oder fange den Zeiger, um abzubrechen.</div>
-      <div class="difficulty-bar">
-        <div class="difficulty-progress" id="diff-progress"></div>
-      </div>
-    </div>
+  <!-- HUD overlay -->
+  <div class="hud" id="hud">SYSTEM COMPROMISED: VERGEHE DICH NICHT</div>
 
-    <!-- Success Screen (Hidden initially) -->
-    <div class="success-box" id="success-box">
-      <h2>SYSTEM ENTSPERRT!</h2>
-      <p>Du hast deinen Mauszeiger erfolgreich wieder eingefangen!</p>
-      <button class="btn" onclick="window.close()" style="background: transparent; border: 1px solid #0f0; color: #0f0; padding: 8px 20px; font-family: inherit; font-size: 16px; cursor: pointer; border-radius: 6px; margin-top: 10px; pointer-events: auto;">Fenster schließen</button>
-    </div>
+  <!-- Success Screen -->
+  <div class="success-box" id="success-box">
+    <h2>SYSTEM WIEDERHERGESTELLT!</h2>
+    <p>Du hast deinen Mauszeiger erfolgreich wieder eingefangen!</p>
+    <button class="btn" onclick="window.close()">Fenster schließen</button>
   </div>
 
   <div class="admin-link" id="admin-btn">Admin-Panel</div>
 
   <script>
-    // ── Matrix Effect ──
-    const canvas = document.getElementById('matrix');
+    const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
+    const userCursor = document.getElementById('user-cursor');
+    const targetCursor = document.getElementById('target-cursor');
+    const hud = document.getElementById('hud');
+    const successBox = document.getElementById('success-box');
 
     function resizeCanvas() {
       canvas.width = window.innerWidth;
@@ -209,155 +197,230 @@
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ$@#%+=-*<>[]';
-    const fontSize = 16;
-    let columns = canvas.width / fontSize;
-    const drops = [];
-
-    for (let i = 0; i < columns; i++) {
-      drops[i] = 1;
-    }
-
-    function drawMatrix() {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.fillStyle = '#0f0';
-      ctx.font = fontSize + 'px monospace';
-
-      for (let i = 0; i < drops.length; i++) {
-        const text = chars.charAt(Math.floor(Math.random() * chars.length));
-        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-
-        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-          drops[i] = 0;
-        }
-        drops[i]++;
-      }
-    }
-    setInterval(drawMatrix, 35);
-
-    // ── Cursor Evasion Game ──
-    const userCursor = document.getElementById('user-cursor');
-    const targetCursor = document.getElementById('target-cursor');
-    const diffProgress = document.getElementById('diff-progress');
-    const gameBox = document.getElementById('game-box');
-    const successBox = document.getElementById('success-box');
-
+    // Mouse positions
     let mouseX = window.innerWidth / 2;
     let mouseY = window.innerHeight / 2;
 
-    // Target coordinates and velocity
-    let tx = window.innerWidth / 3;
-    let ty = window.innerHeight / 3;
-    let vx = 3;
-    let vy = 3;
+    // Virtual cursor position (user's red cursor, can be pushed back)
+    let cx = mouseX;
+    let cy = mouseY;
+    let pushX = 0; // Current push-back offset
+    let pushY = 0;
 
-    let forceFactor = 22; // Evasion strength (decreases over time)
-    const minForce = 2.5;
-    const maxTime = 40; // Seconds until target cursor stops running entirely
+    // Target (ghost) cursor position and velocity
+    let tx = mouseX;
+    let ty = mouseY;
+    let vx = 0;
+    let vy = 0;
+
+    let gameState = "idle"; // "idle" | "stretching" | "running" | "ended"
+    let slimeColor = "rgba(100, 220, 100, 0.85)"; // Slime green
+    let maxStretch = 200; // Slime snaps at 200px
+    let bossActive = false; // Activates when player gets close to catching
+    let forceFactor = 24; // Evasion force
     let elapsedTime = 0;
 
-    // Track real mouse movements
+    // Track mouse movement
     document.addEventListener('mousemove', (e) => {
       mouseX = e.clientX;
       mouseY = e.clientY;
-      
-      // Update custom red crosshair position
-      userCursor.style.left = mouseX + 'px';
-      userCursor.style.top = mouseY + 'px';
+
+      if (gameState === "idle") {
+        // First movement: trigger split and start stretching
+        gameState = "stretching";
+        targetCursor.style.display = "block";
+        tx = mouseX;
+        ty = mouseY;
+        vx = (Math.random() - 0.5) * 8;
+        vy = (Math.random() - 0.5) * 8;
+        
+        // Start TTS
+        try {
+          const utterance = new SpeechSynthesisUtterance("System infiziert. Suche nach deinem Mauszeiger.");
+          utterance.lang = "de-DE";
+          window.speechSynthesis.speak(utterance);
+        } catch(_) {}
+
+        hud.textContent = "VERBINDUNG DEHNEN... MAUSZEIGER TEILT SICH!";
+        hud.classList.add('visible');
+      }
     });
 
-    // Handle difficulty scaling over time
-    const diffTimer = setInterval(() => {
-      elapsedTime++;
-      const pct = Math.max(0, 100 - (elapsedTime / maxTime) * 100);
-      diffProgress.style.width = pct + '%';
-
-      // Decrease evasion force
-      forceFactor = Math.max(minForce, 22 - (elapsedTime / maxTime) * (22 - minForce));
-
-      if (elapsedTime >= maxTime) {
-        clearInterval(diffTimer);
-      }
-    }, 1000);
-
     // Game loop
-    let isGameOver = false;
+    function loop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    function gameLoop() {
-      if (isGameOver) return;
+      if (gameState === "stretching") {
+        // Move target slowly away
+        tx += vx;
+        ty += vy;
 
-      // 1. Move target cursor using standard drift velocity
-      tx += vx;
-      ty += vy;
+        // Keep inside screen
+        keepInScreen();
 
-      // Bounce off screen boundaries
-      if (tx < 10) { tx = 10; vx = Math.abs(vx); }
-      if (tx > window.innerWidth - 25) { tx = window.innerWidth - 25; vx = -Math.abs(vx); }
-      if (ty < 10) { ty = 10; vy = Math.abs(vy); }
-      if (ty > window.innerHeight - 30) { ty = window.innerHeight - 30; vy = -Math.abs(vy); }
+        // Calculate distance
+        const dx = tx - mouseX;
+        const dy = ty - mouseY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-      // 2. Calculate vector from user crosshair to target cursor
-      const dx = tx - mouseX;
-      const dy = ty - mouseY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+        // Draw gooey slime connection
+        drawSlime(mouseX, mouseY, tx, ty, dist);
 
-      // Evasion behavior: push away if user is close
-      if (dist < 260) {
-        const pushForce = (1 - dist / 260) * forceFactor;
-        const nx = dx / (dist || 1);
-        const ny = dy / (dist || 1);
-
-        vx += nx * pushForce * 0.25;
-        vy += ny * pushForce * 0.25;
-
-        // Apply friction/speed limit
-        const maxSpeed = 16;
-        const currentSpeed = Math.sqrt(vx * vx + vy * vy);
-        if (currentSpeed > maxSpeed) {
-          vx = (vx / currentSpeed) * maxSpeed;
-          vy = (vy / currentSpeed) * maxSpeed;
+        if (dist >= maxStretch) {
+          // Snap!
+          gameState = "running";
+          vx = (dx / dist) * 12; // Launch target away
+          vy = (dy / dist) * 12;
+          hud.textContent = "KAPUTT! MAUSZEIGER GEFLOHEN. FANGE IHN!";
+          setTimeout(() => { hud.classList.remove('visible'); }, 3000);
         }
-      } else {
-        vx *= 0.98;
-        vy *= 0.98;
+
+        // Render target
+        targetCursor.style.left = tx + 'px';
+        targetCursor.style.top = ty + 'px';
+        
+        // Render user cursor (no offset yet)
+        cx = mouseX;
+        cy = mouseY;
+        userCursor.style.left = cx + 'px';
+        userCursor.style.top = cy + 'px';
+
+      } else if (gameState === "running") {
+        // Target moves
+        tx += vx;
+        ty += vy;
+
+        keepInScreen();
+
+        // Calculate vector from virtual cursor (cx, cy) to target
+        const dx = tx - cx;
+        const dy = ty - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // Evasion logic & Super Power Push-Back!
+        if (dist < 280) {
+          let pushForce = (1 - dist / 280) * forceFactor;
+          const nx = dx / (dist || 1);
+          const ny = dy / (dist || 1);
+
+          // Evasion velocity
+          vx += nx * pushForce * 0.28;
+          vy += ny * pushForce * 0.28;
+
+          // Limit speed
+          const maxSpeed = 18;
+          const currentSpeed = Math.sqrt(vx * vx + vy * vy);
+          if (currentSpeed > maxSpeed) {
+            vx = (vx / currentSpeed) * maxSpeed;
+            vy = (vy / currentSpeed) * maxSpeed;
+          }
+
+          // Super Power Boss Fight: Push the user's cursor back!
+          // If close, create a physical push offset on the virtual cursor
+          if (dist < 120) {
+            if (!bossActive) {
+              bossActive = true;
+              hud.textContent = "ACHTUNG: CURSOR KÄMPFT GEGEN DICH!";
+              hud.classList.add('visible');
+              setTimeout(() => { hud.classList.remove('visible'); }, 2000);
+            }
+            // Push direction is opposite to target
+            const strength = (1 - dist / 120) * 180;
+            pushX = -nx * strength;
+            pushY = -ny * strength;
+          } else {
+            // Smoothly reduce push back
+            pushX *= 0.85;
+            pushY *= 0.85;
+          }
+        } else {
+          // Slow down when far away
+          vx *= 0.97;
+          vy *= 0.97;
+          pushX *= 0.85;
+          pushY *= 0.85;
+        }
+
+        // Apply push offset to the virtual cursor (cx, cy)
+        cx = mouseX + pushX;
+        cy = mouseY + pushY;
+
+        // Keep virtual user cursor within bounds
+        cx = Math.max(10, Math.min(window.innerWidth - 10, cx));
+        cy = Math.max(10, Math.min(window.innerHeight - 10, cy));
+
+        // Render cursors
+        targetCursor.style.left = tx + 'px';
+        targetCursor.style.top = ty + 'px';
+        userCursor.style.left = cx + 'px';
+        userCursor.style.top = cy + 'px';
+
+        // Collision Check: Virtual cursor catches target cursor
+        const actualDist = Math.sqrt((tx - cx) * (tx - cx) + (ty - cy) * (ty - cy));
+        if (actualDist < 16) {
+          endGame();
+        }
       }
 
-      // Render target cursor
-      targetCursor.style.left = tx + 'px';
-      targetCursor.style.top = ty + 'px';
-
-      // 3. Collision check: Did we catch the cursor?
-      if (dist < 16) {
-        endGame();
+      if (gameState !== "ended") {
+        requestAnimationFrame(loop);
       }
-
-      requestAnimationFrame(gameLoop);
     }
-    
-    // Start game loop
-    requestAnimationFrame(gameLoop);
+
+    // Start loop
+    requestAnimationFrame(loop);
+
+    function keepInScreen() {
+      if (tx < 10) { tx = 10; vx = Math.abs(vx) * 0.8; }
+      if (tx > window.innerWidth - 25) { tx = window.innerWidth - 25; vx = -Math.abs(vx) * 0.8; }
+      if (ty < 10) { ty = 10; vy = Math.abs(vy) * 0.8; }
+      if (ty > window.innerHeight - 30) { ty = window.innerHeight - 30; vy = -Math.abs(vy) * 0.8; }
+    }
+
+    // Draw gooey slime connection on canvas
+    function drawSlime(x1, y1, x2, y2, dist) {
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+      
+      // Slime thickness decreases as it stretches
+      const thickness = Math.max(2, 14 * (1 - dist / maxStretch));
+
+      ctx.beginPath();
+      ctx.strokeStyle = slimeColor;
+      ctx.lineCap = 'round';
+
+      // Draw thick outer goo
+      ctx.lineWidth = thickness;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      // Draw inner core slime
+      ctx.beginPath();
+      ctx.strokeStyle = '#fff'; // White inner core
+      ctx.lineWidth = thickness * 0.4;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      // Draw a blob in the middle
+      ctx.beginPath();
+      ctx.fillStyle = slimeColor;
+      ctx.arc(midX, midY, thickness * 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     function endGame() {
-      isGameOver = true;
-      clearInterval(diffTimer);
-      
-      // Hide red cursor, show normal cursor
+      gameState = "ended";
       userCursor.style.display = 'none';
       targetCursor.style.display = 'none';
       document.body.style.cursor = 'default';
 
-      // Show success popup
-      gameBox.style.display = 'none';
       successBox.style.display = 'block';
-
-      // Exit fullscreen if active
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => {});
       }
 
-      // Play success speech
       try {
         const utterance = new SpeechSynthesisUtterance("System entsperrt. Du hast deinen Cursor wieder eingefangen.");
         utterance.lang = "de-DE";
@@ -365,16 +428,22 @@
       } catch(_) {}
     }
 
-    // Allow exiting the game immediately by pressing ESCAPE or Q (Restore control)
+    // ── Safe Exit Mechanism (Press Y 5 times) ──
+    let yCount = 0;
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' || e.key === 'q' || e.key === 'Q') {
-        endGame();
+      if (e.key === 'y' || e.key === 'Y') {
+        yCount++;
+        if (yCount >= 5) {
+          endGame();
+        }
+      } else {
+        yCount = 0; // Reset on other key press
       }
     });
 
-    // Detect if user exits fullscreen via browser controls (e.g. ESC) to restore mouse immediately
+    // Detect if user exits fullscreen via browser controls to restore cursor
     document.addEventListener('fullscreenchange', () => {
-      if (!document.fullscreenElement && !isGameOver) {
+      if (!document.fullscreenElement && gameState !== "ended") {
         endGame();
       }
     });
@@ -400,13 +469,6 @@
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
       }
-      
-      // Play voice announcement
-      try {
-        const utterance = new SpeechSynthesisUtterance("Achtung! USB-Stick drollolol erkannt. Starte Download von geheimen Daten. Selbstzerstörung eingeleitet.");
-        utterance.lang = "de-DE";
-        window.speechSynthesis.speak(utterance);
-      } catch(_) {}
     }
 
     // Bind to mouse movement and clicks to bypass browser autoplay/fullscreen security
