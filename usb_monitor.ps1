@@ -1,9 +1,33 @@
 # USB Stick Monitor Daemon
 # ==============================
-# Watches for a USB stick with the name/label "drollolol" and launches the viewer.
+# Watches for a USB stick with the name/label "drollolol" and runs the prank.
+# Restores the original wallpaper when the USB stick is unplugged.
 
 $volumeLabel = "drollolol"
 $targetDir = "C:\Users\onlym\.gemini\antigravity\scratch\capture-viewer"
+$prankPath = "$targetDir\prank.ps1"
+
+# Wallpaper API
+$code = @'
+using System;
+using System.Runtime.InteropServices;
+public class Wallpaper {
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
+}
+'@
+Add-Type -TypeDefinition $code -ErrorAction SilentlyContinue
+
+function Restore-Wallpaper {
+    $origFile = "$targetDir\original_wallpaper.txt"
+    if (Test-Path $origFile) {
+        $origPath = (Get-Content $origFile -Raw).Trim()
+        if ($origPath -and (Test-Path $origPath)) {
+            [Wallpaper]::SystemParametersInfo(20, 0, $origPath, 3) | Out-Null
+        }
+        Remove-Item $origFile -Force -ErrorAction SilentlyContinue
+    }
+}
 
 $wasConnected = $false
 
@@ -19,20 +43,14 @@ while ($true) {
     if ($volumes) {
         if (-not $wasConnected) {
             # USB Stick with label "drollolol" was plugged in!
-            # 1. Start Python server if not already running on port 8088
-            $portActive = Get-NetTCPConnection -LocalPort 8088 -State Listen -ErrorAction SilentlyContinue
-            if (-not $portActive) {
-                Start-Process -FilePath "python.exe" -ArgumentList "-m http.server 8088 --bind 127.0.0.1" -WorkingDirectory $targetDir -WindowStyle Hidden
-            }
-            
-            # 2. Open the web viewer in the default browser
-            Start-Process "http://localhost:8088/index.html"
-            
+            # Start the prank sequence stumm in the background
+            Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$prankPath`"" -WindowStyle Hidden
             $wasConnected = $true
         }
     } else {
         if ($wasConnected) {
-            # USB Stick was unplugged
+            # USB Stick was unplugged - Restore original wallpaper!
+            Restore-Wallpaper
             $wasConnected = $false
         }
     }
