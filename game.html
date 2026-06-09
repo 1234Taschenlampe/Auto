@@ -181,7 +181,7 @@
     <div class="box" id="game-box">
       <h1>SYSTEM DECRYPTION LOCKOUT</h1>
       <p>Bewege dein Fadenkreuz und fange deinen entflohenen Cursor!</p>
-      <div style="font-size: 14px; color: #a4ffa4;">Der Cursor weicht dir aus, wird aber mit der Zeit müde...</div>
+      <div style="font-size: 14px; color: #a4ffa4;">Drücke ESCAPE oder fange den Zeiger, um abzubrechen.</div>
       <div class="difficulty-bar">
         <div class="difficulty-progress" id="diff-progress"></div>
       </div>
@@ -345,6 +345,7 @@
       
       // Hide red cursor, show normal cursor
       userCursor.style.display = 'none';
+      targetCursor.style.display = 'none';
       document.body.style.cursor = 'default';
 
       // Show success popup
@@ -363,6 +364,20 @@
         window.speechSynthesis.speak(utterance);
       } catch(_) {}
     }
+
+    // Allow exiting the game immediately by pressing ESCAPE or Q (Restore control)
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' || e.key === 'q' || e.key === 'Q') {
+        endGame();
+      }
+    });
+
+    // Detect if user exits fullscreen via browser controls (e.g. ESC) to restore mouse immediately
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && !isGameOver) {
+        endGame();
+      }
+    });
 
     // ── Admin Dialog ──
     document.getElementById('admin-btn').addEventListener('click', () => {
