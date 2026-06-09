@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DesktopCursorCatchGame")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+73a6daa5b7badd174ebea1dd94c9f5aa08ea0292")]
 [assembly: System.Reflection.AssemblyProductAttribute("DesktopCursorCatchGame")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DesktopCursorCatchGame")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

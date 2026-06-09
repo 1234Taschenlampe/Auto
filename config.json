@@ -1,0 +1,5 @@
+{
+    "TargetLabel": "PRANK",
+    "ActionCommand": "powershell",
+    "ActionArguments": "-ExecutionPolicy Bypass -File start_game.ps1"
+}
