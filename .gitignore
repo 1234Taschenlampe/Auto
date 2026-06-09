@@ -11,3 +11,6 @@ test_env.bat
 # System files
 .DS_Store
 Thumbs.db
+
+# Local restore files
+original_wallpaper.txt
