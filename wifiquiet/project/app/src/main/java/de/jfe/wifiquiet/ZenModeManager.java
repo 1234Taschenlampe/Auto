@@ -4,17 +4,14 @@ import android.app.AutomaticZenRule;
 import android.app.NotificationManager;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.SharedPreferences;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.service.notification.Condition;
-import android.content.Intent;
 
-final class ZenModeManager {
-    private static final String RULE_NAME="WLAN Ruhe";
-    private static final Uri CONDITION_ID=Uri.parse("condition://de.jfe.wifiquiet/wifi");
-    private ZenModeManager() {}
+public final class ZenModeManager {
+    private ZenModeManager(){}
 
     static int filter(int mode){
         if(mode==1) return NotificationManager.INTERRUPTION_FILTER_ALARMS;
@@ -22,84 +19,89 @@ final class ZenModeManager {
         return NotificationManager.INTERRUPTION_FILTER_PRIORITY;
     }
 
-    static String ensureRule(Context c){
-        if(Build.VERSION.SDK_INT<35) return null;
+    static Uri conditionUri(RoutineProfile p){ return Uri.parse("condition://de.jfe.wifiquiet/profile/"+p.id); }
+
+    public static String ensureRule(Context c,RoutineProfile p){
+        if(Build.VERSION.SDK_INT<35 || !p.dndEnabled) return null;
         NotificationManager nm=c.getSystemService(NotificationManager.class);
         if(nm==null || !nm.isNotificationPolicyAccessGranted()) return null;
-        SharedPreferences p=Config.prefs(c);
-        String id=p.getString(Config.ZEN_RULE_ID,null);
-        if(id!=null){
-            try { if(nm.getAutomaticZenRule(id)!=null) return id; } catch(Exception ignored) {}
-            p.edit().remove(Config.ZEN_RULE_ID).apply();
+        if(p.zenRuleId!=null&&!p.zenRuleId.isEmpty()){
+            try{ if(nm.getAutomaticZenRule(p.zenRuleId)!=null){ updateRule(c,p); return p.zenRuleId; } }catch(Exception ignored){}
+            p.zenRuleId="";
         }
-        String ssid=p.getString(Config.SSID,"");
-        AutomaticZenRule rule=new AutomaticZenRule.Builder(RULE_NAME, CONDITION_ID)
-                .setConfigurationActivity(new ComponentName(c,MainActivity.class))
-                .setEnabled(true)
-                .setInterruptionFilter(filter(p.getInt(Config.DND_MODE,0)))
-                .setType(AutomaticZenRule.TYPE_OTHER)
+        AutomaticZenRule rule=new AutomaticZenRule.Builder(p.name,conditionUri(p))
+                .setConfigurationActivity(new ComponentName(c,ProfileEditActivity.class))
+                .setEnabled(p.enabled)
+                .setInterruptionFilter(filter(p.dndMode))
+                .setType(p.timeEnabled?AutomaticZenRule.TYPE_SCHEDULE_TIME:AutomaticZenRule.TYPE_OTHER)
                 .setIconResId(R.drawable.ic_mode_wifi)
                 .setManualInvocationAllowed(true)
-                .setTriggerDescription(ssid.isEmpty()?"Bei Verbindung mit dem gewählten WLAN":"Verbunden mit "+ssid)
+                .setTriggerDescription(summary(p))
                 .build();
-        try {
-            id=nm.addAutomaticZenRule(rule);
-            if(id!=null) p.edit().putString(Config.ZEN_RULE_ID,id).apply();
+        try{
+            String id=nm.addAutomaticZenRule(rule);
+            if(id!=null){ p.zenRuleId=id; ProfileStore.upsert(c,p); }
             return id;
-        } catch(Exception e){ return null; }
+        }catch(Exception e){ return null; }
     }
 
-    static void updateRule(Context c){
-        if(Build.VERSION.SDK_INT<35) return;
+    public static void updateRule(Context c,RoutineProfile p){
+        if(Build.VERSION.SDK_INT<35 || !p.dndEnabled) return;
         NotificationManager nm=c.getSystemService(NotificationManager.class);
         if(nm==null || !nm.isNotificationPolicyAccessGranted()) return;
-        String id=Config.prefs(c).getString(Config.ZEN_RULE_ID,null);
-        if(id==null){ ensureRule(c); return; }
-        try {
-            AutomaticZenRule old=nm.getAutomaticZenRule(id);
-            if(old==null){ Config.prefs(c).edit().remove(Config.ZEN_RULE_ID).apply(); ensureRule(c); return; }
-            if(nm.areAutomaticZenRulesUserManaged()) return;
-            String ssid=Config.prefs(c).getString(Config.SSID,"");
-            AutomaticZenRule updated=new AutomaticZenRule.Builder(old)
-                    .setName(RULE_NAME)
-                    .setConfigurationActivity(new ComponentName(c,MainActivity.class))
-                    .setInterruptionFilter(filter(Config.prefs(c).getInt(Config.DND_MODE,0)))
+        if(p.zenRuleId==null||p.zenRuleId.isEmpty()){ ensureRule(c,p); return; }
+        try{
+            AutomaticZenRule old=nm.getAutomaticZenRule(p.zenRuleId);
+            if(old==null){ p.zenRuleId=""; ProfileStore.upsert(c,p); ensureRule(c,p); return; }
+            AutomaticZenRule r=new AutomaticZenRule.Builder(old)
+                    .setName(p.name)
+                    .setEnabled(p.enabled)
+                    .setInterruptionFilter(filter(p.dndMode))
+                    .setType(p.timeEnabled?AutomaticZenRule.TYPE_SCHEDULE_TIME:AutomaticZenRule.TYPE_OTHER)
                     .setIconResId(R.drawable.ic_mode_wifi)
                     .setManualInvocationAllowed(true)
-                    .setTriggerDescription(ssid.isEmpty()?"Bei Verbindung mit dem gewählten WLAN":"Verbunden mit "+ssid)
+                    .setTriggerDescription(summary(p))
                     .build();
-            nm.updateAutomaticZenRule(id,updated);
-        } catch(Exception ignored) {}
+            nm.updateAutomaticZenRule(p.zenRuleId,r);
+        }catch(Exception ignored){}
     }
 
-    static boolean setActive(Context c, boolean active){
+    public static void setActive(Context c,RoutineProfile p,boolean active){
+        if(Build.VERSION.SDK_INT<35||!p.dndEnabled)return;
         NotificationManager nm=c.getSystemService(NotificationManager.class);
-        if(nm==null || !nm.isNotificationPolicyAccessGranted()) return false;
-        if(Build.VERSION.SDK_INT>=35){
-            String id=ensureRule(c);
-            if(id==null) return false;
-            try {
-                nm.setAutomaticZenRuleState(id,new Condition(CONDITION_ID,
-                        active?"Ziel-WLAN verbunden":"Ziel-WLAN nicht verbunden",
-                        active?Condition.STATE_TRUE:Condition.STATE_FALSE));
-                return true;
-            } catch(Exception e){ return false; }
-        }
-        try {
-            nm.setInterruptionFilter(active?filter(Config.prefs(c).getInt(Config.DND_MODE,0)):NotificationManager.INTERRUPTION_FILTER_ALL);
-            return true;
-        } catch(Exception e){ return false; }
+        if(nm==null||!nm.isNotificationPolicyAccessGranted())return;
+        String id=ensureRule(c,p); if(id==null)return;
+        try{
+            nm.setAutomaticZenRuleState(id,new Condition(conditionUri(p),
+                    active?"Bedingungen erfüllt":"Bedingungen nicht erfüllt",
+                    active?Condition.STATE_TRUE:Condition.STATE_FALSE));
+        }catch(Exception ignored){}
     }
 
-    static void openModeSettings(Context c){
-        if(Build.VERSION.SDK_INT>=35){
-            String id=Config.prefs(c).getString(Config.ZEN_RULE_ID,null);
-            if(id!=null){
-                Intent i=new Intent(Settings.ACTION_AUTOMATIC_ZEN_RULE_SETTINGS);
-                i.putExtra(Settings.EXTRA_AUTOMATIC_ZEN_RULE_ID,id);
-                try { c.startActivity(i); return; } catch(Exception ignored) {}
-            }
+    public static void deleteRule(Context c,RoutineProfile p){
+        if(Build.VERSION.SDK_INT<35||p==null||p.zenRuleId==null||p.zenRuleId.isEmpty())return;
+        try{ NotificationManager nm=c.getSystemService(NotificationManager.class); if(nm!=null)nm.removeAutomaticZenRule(p.zenRuleId); }catch(Exception ignored){}
+    }
+
+    public static void openRule(Context c,RoutineProfile p){
+        if(Build.VERSION.SDK_INT>=35 && p!=null && p.zenRuleId!=null&&!p.zenRuleId.isEmpty()){
+            Intent i=new Intent(Settings.ACTION_AUTOMATIC_ZEN_RULE_SETTINGS);
+            i.putExtra(Settings.EXTRA_AUTOMATIC_ZEN_RULE_ID,p.zenRuleId);
+            try{c.startActivity(i);return;}catch(Exception ignored){}
         }
         c.startActivity(new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS));
     }
+
+    static String summary(RoutineProfile p){
+        StringBuilder s=new StringBuilder();
+        if(p.wifiEnabled) add(s,"WLAN "+p.wifiSsid);
+        if(p.timeEnabled) add(s,fmt(p.startMin)+"–"+fmt(p.endMin));
+        if(p.locationEnabled) add(s,"Standort "+Math.round(p.radiusM)+" m");
+        if(p.chargingMode==1)add(s,"beim Laden"); else if(p.chargingMode==2)add(s,"nicht am Ladegerät");
+        if(p.batteryEnabled)add(s,"Akku "+p.batteryMin+"–"+p.batteryMax+" %");
+        if(p.bluetoothEnabled)add(s,p.bluetoothName.isEmpty()?"Bluetooth verbunden":"Bluetooth "+p.bluetoothName);
+        return s.length()==0?"Manuell oder per App":"Wenn "+s;
+    }
+    private static void add(StringBuilder s,String x){if(s.length()>0)s.append(" + ");s.append(x);}
+    private static String fmt(int m){return String.format(java.util.Locale.GERMANY,"%02d:%02d",(m/60)%24,m%60);}
 }
