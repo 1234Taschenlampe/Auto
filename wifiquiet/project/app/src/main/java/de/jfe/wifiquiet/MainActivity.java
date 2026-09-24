@@ -136,7 +136,7 @@ public class MainActivity extends Activity {
             TextView name=Ui.text(this,p.name,19);
             name.setTypeface(null,android.graphics.Typeface.BOLD);
             TextView badge=Ui.text(this,p.enabled?"Aktiv":"Aus",12);
-            badge.setAlpha(p.enabled?.82f:.45f);
+            badge.setAlpha(p.enabled ? .82f : .45f);
             top.addView(name,new LinearLayout.LayoutParams(0,-2,1));
             top.addView(badge);
             body.addView(top);
