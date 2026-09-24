@@ -407,6 +407,10 @@ public class ProfileEditActivity extends Activity {
 
         ProfileStore.upsert(this,p);
 
+        if(p.enabled){
+            Config.prefs(this).edit().putBoolean(Config.ENGINE_ENABLED,true).apply();
+        }
+
         if(p.dndEnabled){
             NotificationManager nm=getSystemService(NotificationManager.class);
             if(nm!=null&&nm.isNotificationPolicyAccessGranted())ZenModeManager.ensureRule(this,p);
@@ -474,26 +478,24 @@ public class ProfileEditActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},REQ_LOC);
             return;
         }
-        String s=currentSsid();
-        if(s==null)Toast.makeText(this,"WLAN-Name konnte nicht gelesen werden.",Toast.LENGTH_LONG).show();
-        else{wifi.setText(s);wifiOn.setChecked(true);}
-    }
+        LocationManager lm=getSystemService(LocationManager.class);
+        if(lm==null||!lm.isLocationEnabled()){
+            Toast.makeText(this,"Für den WLAN-Namen muss „Standort verwenden“ eingeschaltet sein.",Toast.LENGTH_LONG).show();
+            startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+            return;
+        }
 
-    private String currentSsid(){
-        try{
-            ConnectivityManager cm=getSystemService(ConnectivityManager.class);
-            for(Network n:cm.getAllNetworks()){
-                NetworkCapabilities c=cm.getNetworkCapabilities(n);
-                if(c!=null&&c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)&&c.getTransportInfo() instanceof WifiInfo){
-                    String s=((WifiInfo)c.getTransportInfo()).getSSID();
-                    if(s!=null&&!"<unknown ssid>".equals(s)){
-                        if(s.startsWith("\"")&&s.endsWith("\"")&&s.length()>1)s=s.substring(1,s.length()-1);
-                        return s;
-                    }
-                }
+        Toast.makeText(this,"WLAN wird erkannt …",Toast.LENGTH_SHORT).show();
+        WifiSsidReader.readAsync(this,s->{
+            if(isFinishing())return;
+            if(s==null){
+                Toast.makeText(this,"WLAN-Name konnte nicht gelesen werden. Prüfe „Genauer Standort“ für diese App.",Toast.LENGTH_LONG).show();
+            }else{
+                wifi.setText(s);
+                wifiOn.setChecked(true);
+                Toast.makeText(this,"Übernommen: "+s,Toast.LENGTH_SHORT).show();
             }
-        }catch(Exception ignored){}
-        return null;
+        });
     }
 
     private void captureLocation(){
