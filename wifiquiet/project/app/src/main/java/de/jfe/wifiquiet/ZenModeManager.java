@@ -26,7 +26,7 @@ public final class ZenModeManager {
         NotificationManager nm=c.getSystemService(NotificationManager.class);
         if(nm==null || !nm.isNotificationPolicyAccessGranted()) return null;
         if(p.zenRuleId!=null&&!p.zenRuleId.isEmpty()){
-            try{ if(nm.getAutomaticZenRule(p.zenRuleId)!=null){ updateRule(c,p); return p.zenRuleId; } }catch(Exception ignored){}
+            try{ if(nm.getAutomaticZenRule(p.zenRuleId)!=null) return p.zenRuleId; }catch(Exception ignored){}
             p.zenRuleId="";
         }
         AutomaticZenRule rule=new AutomaticZenRule.Builder(p.name,conditionUri(p))
