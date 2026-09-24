@@ -99,7 +99,8 @@ public final class ZenModeManager {
         if(p.locationEnabled) add(s,"Standort "+Math.round(p.radiusM)+" m");
         if(p.chargingMode==1)add(s,"beim Laden"); else if(p.chargingMode==2)add(s,"nicht am Ladegerät");
         if(p.batteryEnabled)add(s,"Akku "+p.batteryMin+"–"+p.batteryMax+" %");
-        if(p.bluetoothEnabled)add(s,p.bluetoothName.isEmpty()?"Bluetooth verbunden":"Bluetooth "+p.bluetoothName);
+        if(p.bluetoothMode==1)add(s,p.bluetoothName.isEmpty()?"Bluetooth verbunden":"Bluetooth "+p.bluetoothName+" verbunden");
+        if(p.bluetoothMode==2)add(s,p.bluetoothName.isEmpty()?"Bluetooth getrennt":"Bluetooth "+p.bluetoothName+" getrennt");
         return s.length()==0?"Manuell oder per App":"Wenn "+s;
     }
     private static void add(StringBuilder s,String x){if(s.length()>0)s.append(" + ");s.append(x);}
