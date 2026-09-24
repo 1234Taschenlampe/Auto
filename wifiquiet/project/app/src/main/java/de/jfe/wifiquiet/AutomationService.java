@@ -32,6 +32,7 @@ public class AutomationService extends Service {
     private final Map<Integer,BluetoothProfile> btProfiles=new HashMap<>();
     private final Set<String> connectedBt=new HashSet<>();
     private BroadcastReceiver powerRx,btRx;
+    private String currentWifiSsid;
 
     private final Runnable tick=new Runnable(){
         @Override public void run(){
@@ -71,11 +72,44 @@ public class AutomationService extends Service {
     }
 
     private void registerWatchers(){
-        netCb=new ConnectivityManager.NetworkCallback(){
-            @Override public void onAvailable(Network n){h.post(AutomationService.this::evaluate);}
-            @Override public void onLost(Network n){h.post(AutomationService.this::evaluate);}
-            @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){h.post(AutomationService.this::evaluate);}
-        };
+        currentWifiSsid=WifiSsidReader.current(this);
+
+        netCb=Build.VERSION.SDK_INT>=31
+                ? new ConnectivityManager.NetworkCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO){
+                    @Override public void onAvailable(Network n){
+                        String s=WifiSsidReader.current(AutomationService.this);
+                        if(s!=null)currentWifiSsid=s;
+                        h.post(AutomationService.this::evaluate);
+                    }
+                    @Override public void onLost(Network n){
+                        h.postDelayed(()->{
+                            currentWifiSsid=WifiSsidReader.current(AutomationService.this);
+                            evaluate();
+                        },500);
+                    }
+                    @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities caps){
+                        String s=WifiSsidReader.fromCapabilities(caps);
+                        if(s!=null)currentWifiSsid=s;
+                        h.post(AutomationService.this::evaluate);
+                    }
+                }
+                : new ConnectivityManager.NetworkCallback(){
+                    @Override public void onAvailable(Network n){
+                        currentWifiSsid=WifiSsidReader.current(AutomationService.this);
+                        h.post(AutomationService.this::evaluate);
+                    }
+                    @Override public void onLost(Network n){
+                        h.postDelayed(()->{
+                            currentWifiSsid=WifiSsidReader.current(AutomationService.this);
+                            evaluate();
+                        },500);
+                    }
+                    @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities caps){
+                        String s=WifiSsidReader.fromCapabilities(caps);
+                        if(s!=null)currentWifiSsid=s;
+                        h.post(AutomationService.this::evaluate);
+                    }
+                };
         try{
             cm.registerNetworkCallback(new NetworkRequest.Builder()
                     .addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),netCb);
@@ -198,9 +232,10 @@ public class AutomationService extends Service {
                 activeIds.add(p.id);
             }
 
-            if(p.dndEnabled){
-                if(newAuto.contains(p.id)&&!oldAuto.contains(p.id))ZenModeManager.setActive(this,p,true);
-                else if(!newAuto.contains(p.id)&&oldAuto.contains(p.id))ZenModeManager.setActive(this,p,false);
+            if(p.dndEnabled && !manual.contains(p.id)){
+                // Reconcile every evaluation. This repairs the Pixel Mode state after
+                // service/process restarts instead of relying only on an in-memory edge.
+                ZenModeManager.setActive(this,p,newAuto.contains(p.id));
             }
         }
 
@@ -348,21 +383,9 @@ public class AutomationService extends Service {
     }
 
     private String currentSsid(){
-        try{
-            for(Network n:cm.getAllNetworks()){
-                NetworkCapabilities c=cm.getNetworkCapabilities(n);
-                if(c!=null&&c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)&&
-                        c.getTransportInfo() instanceof WifiInfo){
-                    String s=((WifiInfo)c.getTransportInfo()).getSSID();
-                    if(s!=null&&!"<unknown ssid>".equals(s)){
-                        if(s.startsWith("\"")&&s.endsWith("\"")&&s.length()>1)
-                            s=s.substring(1,s.length()-1);
-                        return s;
-                    }
-                }
-            }
-        }catch(Exception ignored){}
-        return null;
+        if(currentWifiSsid!=null)return currentWifiSsid;
+        currentWifiSsid=WifiSsidReader.current(this);
+        return currentWifiSsid;
     }
 
     private Intent battery(){return registerReceiver(null,new IntentFilter(Intent.ACTION_BATTERY_CHANGED));}
