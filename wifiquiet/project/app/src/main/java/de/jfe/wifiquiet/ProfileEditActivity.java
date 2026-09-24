@@ -413,7 +413,10 @@ public class ProfileEditActivity extends Activity {
 
         if(p.dndEnabled){
             NotificationManager nm=getSystemService(NotificationManager.class);
-            if(nm!=null&&nm.isNotificationPolicyAccessGranted())ZenModeManager.ensureRule(this,p);
+            if(nm!=null&&nm.isNotificationPolicyAccessGranted()){
+                ZenModeManager.ensureRule(this,p);
+                ZenModeManager.updateRule(this,p);
+            }
         }
 
         if(p.lockScreenEnabled&&!DeviceAdminHelper.isActive(this)){
