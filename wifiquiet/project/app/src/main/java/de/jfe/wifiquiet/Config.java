@@ -2,13 +2,12 @@ package de.jfe.wifiquiet;
 import android.content.Context;
 import android.content.SharedPreferences;
 final class Config {
-    static final String PREFS="wifiquiet", SSID="ssid", DND_ENABLED="dnd_enabled", DND_MODE="dnd_mode",
-            MEDIA_ENABLED="media_enabled", MEDIA_PERCENT="media_percent", RING_ENABLED="ring_enabled",
-            RING_PERCENT="ring_percent", RESTORE="restore", SERVICE_RUNNING="service_running",
-            PROFILE_ACTIVE="profile_active", LAST_SSID="last_ssid", LAST_STATUS="last_status",
+    static final String PREFS="wifiquiet";
+    static final String ENGINE_ENABLED="engine_enabled", SERVICE_RUNNING="service_running",
+            ENGINE_ACTIVE_IDS="engine_active_ids", LAST_STATUS="last_status",
+            BASELINE_VALID="baseline_valid", BASELINE_RESTORE="baseline_restore",
             ORIGINAL_MEDIA="original_media", ORIGINAL_RING="original_ring", ORIGINAL_NOTIFICATION="original_notification",
-            APPLIED_MEDIA="applied_media", APPLIED_RING="applied_ring", RESTORE_AT_APPLY="restore_at_apply",
-            ZEN_RULE_ID="zen_rule_id";
-    private Config() {}
-    static SharedPreferences prefs(Context c){ return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE); }
+            ORIGINAL_BRIGHTNESS="original_brightness", ORIGINAL_ROTATION="original_rotation", ORIGINAL_TIMEOUT="original_timeout";
+    private Config(){}
+    static SharedPreferences prefs(Context c){return c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);}
 }
