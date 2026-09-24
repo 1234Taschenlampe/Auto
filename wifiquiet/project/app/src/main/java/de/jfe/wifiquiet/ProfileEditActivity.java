@@ -359,7 +359,7 @@ public class ProfileEditActivity extends Activity {
         boolean event=mode==2;
         eventHint.setVisibility(event?View.VISIBLE:View.GONE);
         restore.setEnabled(!event);
-        restore.setAlpha(event?.45f:1f);
+        restore.setAlpha(event ? .45f : 1f);
     }
 
     private void updateAdminStatus(){
