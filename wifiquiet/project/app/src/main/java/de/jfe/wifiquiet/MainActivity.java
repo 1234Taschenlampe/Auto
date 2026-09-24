@@ -94,6 +94,21 @@ public class MainActivity extends Activity {
 
     @Override protected void onResume(){
         super.onResume();
+
+        SharedPreferences sp=Config.prefs(this);
+        if(!sp.contains(Config.ENGINE_ENABLED)){
+            boolean anyEnabled=false;
+            for(RoutineProfile p:ProfileStore.load(this)) if(p.enabled){anyEnabled=true;break;}
+            if(anyEnabled)sp.edit().putBoolean(Config.ENGINE_ENABLED,true).apply();
+        }
+
+        if(sp.getBoolean(Config.ENGINE_ENABLED,false) &&
+                !sp.getBoolean(Config.SERVICE_RUNNING,false)){
+            try{
+                startForegroundService(new Intent(this,AutomationService.class)
+                        .setAction(AutomationService.ACTION_START));
+            }catch(Exception ignored){}
+        }
         refresh();
     }
 
