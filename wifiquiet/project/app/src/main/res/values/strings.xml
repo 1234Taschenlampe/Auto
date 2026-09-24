@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Routinen</string>
+    <string name="device_admin_label">Routinen – Display sperren</string>
+    <string name="device_admin_description">Erlaubt ausschließlich die Aktion „Display sofort sperren“, wenn du sie in einer Routine auswählst.</string>
+</resources>
